@@ -38,6 +38,11 @@ def get_train_datasets(args: argparse.Namespace):
                                  transform=train_transforms)
         val_data = ModelNetHdf(args.dataset_path, subset='test', categories=val_categories,
                                transform=val_transforms)
+        
+    elif args.dataset_type == 'ycb':
+        train_data = YCBobjects(args.dataset_path, transform='crop')
+        val_data = YCBobjects(args.dataset_path, transform='crop')
+        
     else:
         raise NotImplementedError
 
@@ -86,7 +91,9 @@ def get_transforms(noise_type: str,
         train_transforms, test_transforms: Both contain list of transformations to be applied
     """
 
-    partial_p_keep = partial_p_keep if partial_p_keep is not None else [0.7, 0.7]
+    partial_p_keep = partial_p_keep if partial_p_keep is not None else [0.3, 1]
+    
+    print("partial_p_keep", partial_p_keep)
 
     if noise_type == "clean":
         # 1-1 correspondence for each point (resample first before splitting), no noise
@@ -137,6 +144,47 @@ def get_transforms(noise_type: str,
 
     return train_transforms, test_transforms
 
+
+class YCBobjects(Dataset):
+    
+    def __init__(self, dataset_path: str, transform=None):
+        
+        self._logger = logging.getLogger(self.__class__.__name__)
+        self._root = dataset_path
+        self._data = []
+        self._labels = []
+        self._transform = transform
+        
+        for root, dirs, files in os.walk(dataset_path):
+            for file in files:
+                if file.endswith(".pcd"):
+                    self._data.append(os.path.join(root, file))
+                    self._labels.append(root.split('/')[-1])
+        
+        self._logger.info('Loaded {} instances.'.format(len(self._data)))
+        
+    
+    def __getitem__(self, item):
+        
+        
+        ply = o3d.io.read_point_cloud(self._data[item])
+        points = np.asarray(ply.points)
+        
+        sample = {'points':points}
+        
+        
+        if self._transform:
+            sample = self._transform(sample)
+        
+        return sample
+    
+    
+    def __len__(self):
+        return len(self._data)
+    
+    
+        
+        
 
 class ModelNetHdf(Dataset):
     def __init__(self, dataset_path: str, subset: str = 'train', categories: List = None, transform=None):
