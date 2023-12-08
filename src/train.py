@@ -273,6 +273,7 @@ def run(train_set, val_set):
             tbar.update(1)
 
             if global_step % _args.summary_every == 0:  # Save tensorboard logs
+                print('Saving summaries...')
                 save_summaries(train_writer, data=train_data, predicted=pred_transforms, endpoints=endpoints,
                                losses=train_losses, step=global_step)
 

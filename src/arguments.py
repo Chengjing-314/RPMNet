@@ -14,11 +14,11 @@ def rpmnet_arguments():
     parser.add_argument('--debug', action='store_true', help='If set, will enable autograd anomaly detection')
     # settings for input data_loader
     parser.add_argument('-i', '--dataset_path',
-                        default='../datasets/modelnet40_ply_hdf5_2048',
+                        default='/home/chengjing/Desktop/RPMNet/ycb',
                         type=str, metavar='PATH',
                         help='path to the processed dataset. Default: ../datasets/modelnet40_ply_hdf5_2048')
-    parser.add_argument('--dataset_type', default='modelnet_hdf',
-                        choices=['modelnet_hdf', 'bunny', 'armadillo', 'buddha', 'dragon'],
+    parser.add_argument('--dataset_type', default='ycb',
+                        choices=['modelnet_hdf', 'bunny', 'armadillo', 'buddha', 'dragon', 'ycb'],
                         metavar='DATASET', help='dataset type (default: modelnet_hdf)')
     parser.add_argument('--num_points', default=1024, type=int,
                         metavar='N', help='points in point-cloud (default: 1024)')
@@ -28,7 +28,7 @@ def rpmnet_arguments():
                         metavar='T', help='Maximum magnitude of rotation perturbation (in degrees)')
     parser.add_argument('--trans_mag', default=0.5, type=float,
                         metavar='T', help='Maximum magnitude of translation perturbation')
-    parser.add_argument('--partial', default=[0.7, 0.7], nargs='+', type=float,
+    parser.add_argument('--partial', default=[0.3, 0.9], nargs='+', type=float,
                         help='Approximate proportion of points to keep for partial overlap (Set to 1.0 to disable)')
     # Model
     parser.add_argument('--method', type=str, default='rpmnet', choices=['rpmnet'],
@@ -66,9 +66,9 @@ def rpmnet_train_arguments():
     """Used only for training"""
     parser = argparse.ArgumentParser(parents=[rpmnet_arguments()])
 
-    parser.add_argument('--train_categoryfile', type=str, metavar='PATH', default='./data_loader/modelnet40_half1.txt',
+    parser.add_argument('--train_categoryfile', type=str, metavar='PATH', default='',
                         help='path to the categories to be trained')  # eg. './dataset/modelnet40_half1.txt'
-    parser.add_argument('--val_categoryfile', type=str, metavar='PATH', default='./data_loader/modelnet40_half1.txt',
+    parser.add_argument('--val_categoryfile', type=str, metavar='PATH', default='',
                         help='path to the categories to be val')  # eg. './sampledata/modelnet40_half1.txt'
     # Training parameters
     parser.add_argument('--lr', default=1e-4, type=float, help='Learning rate during training')
@@ -79,7 +79,7 @@ def rpmnet_train_arguments():
     parser.add_argument('--validate_every', default=-4, type=int, metavar='N',
                         help='Frequency of evaluation (number of steps if positive, number of epochs if negative).'
                              'Also saves checkpoints at the same interval')
-    parser.add_argument('--num_workers', default=4, type=int,
+    parser.add_argument('--num_workers', default=0, type=int,
                         help='Number of workers for data_loader loader (default: 4).')
     parser.add_argument('--num_train_reg_iter', type=int, default=2,
                         help='Number of outer iterations used for registration (only during training)')

@@ -4,6 +4,8 @@ import argparse
 import logging
 import os
 from typing import List
+import sys 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import h5py
 import numpy as np
@@ -13,6 +15,7 @@ import torchvision
 
 import data_loader.transforms as Transforms
 import common.math.se3 as se3
+
 
 _logger = logging.getLogger()
 
@@ -40,8 +43,8 @@ def get_train_datasets(args: argparse.Namespace):
                                transform=val_transforms)
         
     elif args.dataset_type == 'ycb':
-        train_data = YCBobjects(args.dataset_path, transform='crop')
-        val_data = YCBobjects(args.dataset_path, transform='crop')
+        train_data = YCBobjects(args.dataset_path, transform=train_transforms)
+        val_data = YCBobjects(args.dataset_path, transform=val_transforms)
         
     else:
         raise NotImplementedError
@@ -148,43 +151,67 @@ def get_transforms(noise_type: str,
 class YCBobjects(Dataset):
     
     def __init__(self, dataset_path: str, transform=None):
-        
         self._logger = logging.getLogger(self.__class__.__name__)
         self._root = dataset_path
         self._data = []
-        self._labels = []
         self._transform = transform
         
-        for root, dirs, files in os.walk(dataset_path):
-            for file in files:
-                if file.endswith(".pcd"):
-                    self._data.append(os.path.join(root, file))
-                    self._labels.append(root.split('/')[-1])
+        f = open(os.path.join(dataset_path, 'objects.txt'))
+        object_list = [line.strip() for line in f.readlines()]
+        f.close()
         
-        self._logger.info('Loaded {} instances.'.format(len(self._data)))
+        self.objects_list = object_list
+        # Iterate over the list of objects and add the path to the point cloud file to _data
+        for obj in self.objects_list:
+            ply_file = os.path.join(self._root, obj, 'clouds', 'merged_cloud.ply')
+            if os.path.exists(ply_file):
+                self._data.append(ply_file)
+            else:
+                self._logger.warning(f"File not found: {ply_file}")
         
-    
     def __getitem__(self, item):
-        
-        
+        # Load the point cloud
         ply = o3d.io.read_point_cloud(self._data[item])
         points = np.asarray(ply.points)
         
-        sample = {'points':points}
+        #uniform sample 20k points
         
+        # print("points.shape", points.shape)
         
+        # Estimate normals
+        ply.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+
+        # Optionally orient the normals (this can be important for consistency)
+        ply.orient_normals_consistent_tangent_plane(50)
+
+        # Extract points and normals
+        points = np.asarray(ply.points)
+        normals = np.asarray(ply.normals)
+
+        # Concatenate points and normals
+
+        
+        num_desired_points = 2048 * 3  # for example
+        if len(points) > num_desired_points:
+            # Randomly sample points
+            indices = np.random.choice(len(points), num_desired_points, replace=False)
+            points = points[indices]
+            normals = normals[indices]
+
+        points_with_normals = np.concatenate([points, normals], axis=1).astype(np.float32)
+
+        
+        sample = {'points': points_with_normals}
+        
+        # Apply transformations if any
         if self._transform:
             sample = self._transform(sample)
         
         return sample
     
-    
     def __len__(self):
         return len(self._data)
     
-    
-        
-        
 
 class ModelNetHdf(Dataset):
     def __init__(self, dataset_path: str, subset: str = 'train', categories: List = None, transform=None):
@@ -281,3 +308,19 @@ class ModelNetHdf(Dataset):
 
     def to_category(self, i):
         return self._idx2category[i]
+
+
+def main():
+    
+    output_directory = "/home/chengjing/Desktop/RPMNet/ycb"
+    f = open(os.path.join(output_directory, 'objects.txt'))
+    object_list = [line.strip() for line in f.readlines()]
+    f.close()
+    
+    dset = YCBobjects(output_directory, object_list)
+    
+    print("len(dset)", len(dset))
+
+
+if __name__ == '__main__':
+    main()
