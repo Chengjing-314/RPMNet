@@ -178,6 +178,13 @@ class YCBobjects(Dataset):
         
         # print("points.shape", points.shape)
         
+        num_desired_points = 2048 * 10 # for example
+        if len(points) > num_desired_points:
+            indices = np.random.choice(len(points), num_desired_points, replace=False)
+            points = points[indices]
+            
+        ply.points = o3d.utility.Vector3dVector(points)
+        
         # Estimate normals
         ply.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
 
@@ -190,18 +197,11 @@ class YCBobjects(Dataset):
 
         # Concatenate points and normals
 
-        
-        num_desired_points = 2048 * 3  # for example
-        if len(points) > num_desired_points:
-            # Randomly sample points
-            indices = np.random.choice(len(points), num_desired_points, replace=False)
-            points = points[indices]
-            normals = normals[indices]
-
         points_with_normals = np.concatenate([points, normals], axis=1).astype(np.float32)
+        
 
         
-        sample = {'points': points_with_normals}
+        sample = {'points': points_with_normals, 'idx': np.array(item, dtype=np.int32)}
         
         # Apply transformations if any
         if self._transform:

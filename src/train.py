@@ -113,6 +113,8 @@ def save_summaries(writer: SummaryWriter, data: Dict, predicted: List, endpoints
     """Save tensorboard summaries"""
 
     subset = [0, 1]
+    
+    print('saving summaries...')
 
     with torch.no_grad():
         # Save clouds
@@ -221,6 +223,8 @@ def run(train_set, val_set):
     model.to(_device)
     global_step = 0
 
+    print("num_workers: ", _args.num_workers)
+    
     # dataloaders
     train_loader = torch.utils.data.DataLoader(train_set,
                                                batch_size=_args.train_batch_size, shuffle=True, num_workers=_args.num_workers)

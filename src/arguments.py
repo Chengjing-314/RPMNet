@@ -7,14 +7,14 @@ def rpmnet_arguments():
     parser = argparse.ArgumentParser(add_help=False)
 
     # Logging
-    parser.add_argument('--logdir', default='../logs', type=str,
+    parser.add_argument('--logdir', default='/data/chengjingyuan/RPMNet/logs', type=str,
                         help='Directory to store logs, summaries, checkpoints.')
     parser.add_argument('--dev', action='store_true', help='If true, will ignore logdir and log to ../logdev instead')
     parser.add_argument('--name', type=str, help='Prefix to add to logging directory')
     parser.add_argument('--debug', action='store_true', help='If set, will enable autograd anomaly detection')
     # settings for input data_loader
     parser.add_argument('-i', '--dataset_path',
-                        default='/home/chengjing/Desktop/RPMNet/ycb',
+                        default='/data/chengjingyuan/RPMNet/ycb',
                         type=str, metavar='PATH',
                         help='path to the processed dataset. Default: ../datasets/modelnet40_ply_hdf5_2048')
     parser.add_argument('--dataset_type', default='ycb',
@@ -24,7 +24,7 @@ def rpmnet_arguments():
                         metavar='N', help='points in point-cloud (default: 1024)')
     parser.add_argument('--noise_type', default='crop', choices=['clean', 'jitter', 'crop'],
                         help='Types of perturbation to consider')
-    parser.add_argument('--rot_mag', default=45.0, type=float,
+    parser.add_argument('--rot_mag', default=90.0, type=float,
                         metavar='T', help='Maximum magnitude of rotation perturbation (in degrees)')
     parser.add_argument('--trans_mag', default=0.5, type=float,
                         metavar='T', help='Maximum magnitude of translation perturbation')
@@ -79,7 +79,7 @@ def rpmnet_train_arguments():
     parser.add_argument('--validate_every', default=-4, type=int, metavar='N',
                         help='Frequency of evaluation (number of steps if positive, number of epochs if negative).'
                              'Also saves checkpoints at the same interval')
-    parser.add_argument('--num_workers', default=0, type=int,
+    parser.add_argument('--num_workers', default=32, type=int,
                         help='Number of workers for data_loader loader (default: 4).')
     parser.add_argument('--num_train_reg_iter', type=int, default=2,
                         help='Number of outer iterations used for registration (only during training)')
@@ -99,7 +99,7 @@ def rpmnet_eval_arguments():
     parser.add_argument('--transform_file', type=str,
                         help='If provided, will use transforms from this provided pickle file')
     # Save out evaluation data_loader for further analysis
-    parser.add_argument('--eval_save_path', type=str, default='../eval_results',
+    parser.add_argument('--eval_save_path', type=str, default='/data/chengjingyuan/RPMNet/eval_results',
                         help='Output data_loader to save evaluation results')
 
     parser.description = 'RPMNet evaluation'
