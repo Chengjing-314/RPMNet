@@ -163,44 +163,32 @@ class YCBobjects(Dataset):
         self.objects_list = object_list
         # Iterate over the list of objects and add the path to the point cloud file to _data
         for obj in self.objects_list:
-            ply_file = os.path.join(self._root, obj, 'clouds', 'merged_cloud.ply')
+            ply_file = os.path.join(self._root, obj, 'clouds', 'normalized_merged_cloud.ply')
+            normals_file = os.path.join(self._root, obj, 'clouds', 'normals.npy')
             if os.path.exists(ply_file):
-                self._data.append(ply_file)
+                cloud = o3d.io.read_point_cloud(ply_file)
+                points_with_normal = self.pre_process_pc(np.asarray(cloud.points), np.load(normals_file))
+                self._data.append(points_with_normal)
             else:
                 self._logger.warning(f"File not found: {ply_file}")
+                
+    def pre_process_pc(self, pc, normals):
+        #uniform sample 20k points
+        num_points = 2048 * 15
+        
+        rand_indices = np.random.choice(pc.shape[0], num_points, replace=False)
+        
+        points = pc[rand_indices]
+        normals = normals[rand_indices]
+            
+        points_with_normals = np.concatenate([points, normals], axis=1).astype(np.float32)
+        
+        return points_with_normals
+
         
     def __getitem__(self, item):
         # Load the point cloud
-        ply = o3d.io.read_point_cloud(self._data[item])
-        points = np.asarray(ply.points)
-        
-        #uniform sample 20k points
-        
-        # print("points.shape", points.shape)
-        
-        num_desired_points = 2048 * 10 # for example
-        if len(points) > num_desired_points:
-            indices = np.random.choice(len(points), num_desired_points, replace=False)
-            points = points[indices]
-            
-        ply.points = o3d.utility.Vector3dVector(points)
-        
-        # Estimate normals
-        ply.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-
-        # Optionally orient the normals (this can be important for consistency)
-        ply.orient_normals_consistent_tangent_plane(50)
-
-        # Extract points and normals
-        points = np.asarray(ply.points)
-        normals = np.asarray(ply.normals)
-
-        # Concatenate points and normals
-
-        points_with_normals = np.concatenate([points, normals], axis=1).astype(np.float32)
-        
-
-        
+        points_with_normals = self._data[item]
         sample = {'points': points_with_normals, 'idx': np.array(item, dtype=np.int32)}
         
         # Apply transformations if any

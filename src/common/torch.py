@@ -13,6 +13,14 @@ import numpy as np
 import torch
 from torch.optim.optimizer import Optimizer
 
+import GPUtil
+
+
+def get_free_gpu():
+    deviceIDs = GPUtil.getAvailable(order='first', limit=8, maxLoad=0.3, maxMemory=0.5, excludeID=[], excludeUUID=[])
+    print("Available GPU IDs: {}".format(deviceIDs))
+    return deviceIDs[0]
+
 
 def dict_all_to_device(tensor_dict, device):
     """Sends everything into a certain device """
@@ -108,7 +116,7 @@ class CheckPointManager(object):
         self._remove_old_checkpoints()
         self._update_checkpoints_file()
 
-    def load(self, save_path, model: torch.nn.Module = None, optimizer: Optimizer = None):
+    def load(self, save_path, _device, model: torch.nn.Module = None, optimizer: Optimizer = None):
         """Loads saved model from file
 
         Args:
@@ -119,7 +127,7 @@ class CheckPointManager(object):
         if os.path.isdir(save_path):
             save_path = os.path.join(save_path, 'model-best.pth')
 
-        state = torch.load(save_path)
+        state = torch.load(save_path, map_location=_device)
 
         step = 0
         if 'step' in state:

@@ -26,20 +26,29 @@ from common.math_torch import se3
 from data_loader.datasets import get_train_datasets
 from eval import compute_metrics, summarize_metrics, print_metrics
 from models.rpmnet import get_model
+import GPUtil
+
+
+def get_free_gpu():
+    deviceIDs = GPUtil.getAvailable(order='first', limit=8, maxLoad=0.3, maxMemory=0.5, excludeID=[], excludeUUID=[])
+    print("Available GPU IDs: {}".format(deviceIDs))
+    return deviceIDs[0]
 
 # Set up arguments and logging
 parser = rpmnet_train_arguments()
 _args = parser.parse_args()
 _logger, _log_path = prepare_logger(_args)
 if _args.gpu >= 0:
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(_args.gpu)
-    _device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+    # os.environ['CUDA_VISIBLE_DEVICES'] = str(_args.gpu)
+    # _device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+    _device = torch.device('cuda:{}'.format(get_free_gpu())) if torch.cuda.is_available() else torch.device('cpu')
 else:
     _device = torch.device('cpu')
 
 
 def main():
     train_set, val_set = get_train_datasets(_args)
+    print(torch.cuda.device_count())
     run(train_set, val_set)
 
 
@@ -239,7 +248,7 @@ def run(train_set, val_set):
     val_writer = SummaryWriter(os.path.join(_log_path, 'val'), flush_secs=10)
     saver = CheckPointManager(os.path.join(_log_path, 'ckpt', 'model'), keep_checkpoint_every_n_hours=0.5)
     if _args.resume is not None:
-        global_step = saver.load(_args.resume, model, optimizer)
+        global_step = saver.load(_args.resume, _device, model, optimizer)
 
     # trainings
     torch.autograd.set_detect_anomaly(_args.debug)

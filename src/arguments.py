@@ -7,14 +7,14 @@ def rpmnet_arguments():
     parser = argparse.ArgumentParser(add_help=False)
 
     # Logging
-    parser.add_argument('--logdir', default='/data/chengjingyuan/RPMNet/logs', type=str,
+    parser.add_argument('--logdir', default='/data/chengjingyuan/RPMNet_hacleg/logs', type=str,
                         help='Directory to store logs, summaries, checkpoints.')
     parser.add_argument('--dev', action='store_true', help='If true, will ignore logdir and log to ../logdev instead')
     parser.add_argument('--name', type=str, help='Prefix to add to logging directory')
     parser.add_argument('--debug', action='store_true', help='If set, will enable autograd anomaly detection')
     # settings for input data_loader
     parser.add_argument('-i', '--dataset_path',
-                        default='/data/chengjingyuan/RPMNet/ycb',
+                        default='/data/chengjingyuan/RPMNet_hacleg/ycb',
                         type=str, metavar='PATH',
                         help='path to the processed dataset. Default: ../datasets/modelnet40_ply_hdf5_2048')
     parser.add_argument('--dataset_type', default='ycb',
@@ -53,7 +53,7 @@ def rpmnet_arguments():
     # Training parameters
     parser.add_argument('--train_batch_size', default=8, type=int, metavar='N',
                         help='training mini-batch size (default 8)')
-    parser.add_argument('-b', '--val_batch_size', default=16, type=int, metavar='N',
+    parser.add_argument('-b', '--val_batch_size', default=8, type=int, metavar='N',
                         help='mini-batch size during validation or testing (default: 16)')
     parser.add_argument('--resume', default=None, type=str, metavar='PATH',
                         help='Pretrained network to load from. Optional for train, required for inference.')
@@ -79,7 +79,7 @@ def rpmnet_train_arguments():
     parser.add_argument('--validate_every', default=-4, type=int, metavar='N',
                         help='Frequency of evaluation (number of steps if positive, number of epochs if negative).'
                              'Also saves checkpoints at the same interval')
-    parser.add_argument('--num_workers', default=32, type=int,
+    parser.add_argument('--num_workers', default=4, type=int,
                         help='Number of workers for data_loader loader (default: 4).')
     parser.add_argument('--num_train_reg_iter', type=int, default=2,
                         help='Number of outer iterations used for registration (only during training)')
