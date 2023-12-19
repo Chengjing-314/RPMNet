@@ -30,6 +30,15 @@ from common.math.so3 import dcm2euler
 from data_loader.datasets import get_test_datasets
 import models.rpmnet
 
+from models.rpmnet import get_model
+import GPUtil
+
+
+def get_free_gpu():
+    deviceIDs = GPUtil.getAvailable(order='first', limit=8, maxLoad=0.3, maxMemory=0.5, excludeID=[], excludeUUID=[])
+    print("Available GPU IDs: {}".format(deviceIDs))
+    return deviceIDs[0]
+
 
 def compute_metrics(data: Dict, pred_transforms) -> Dict:
     """Compute metrics required in the paper
@@ -274,7 +283,7 @@ def get_model():
         model = models.rpmnet.get_model(_args)
         model.to(_device)
         saver = CheckPointManager(os.path.join(_log_path, 'ckpt', 'models'))
-        saver.load(_args.resume, model)
+        saver.load(_args.resume,_device, model)
     else:
         raise NotImplementedError
     return model
@@ -306,11 +315,12 @@ if __name__ == '__main__':
     parser = rpmnet_eval_arguments()
     _args = parser.parse_args()
     _logger, _log_path = prepare_logger(_args, log_path=_args.eval_save_path)
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(_args.gpu)
-    if _args.gpu >= 0 and (_args.method == 'rpm' or _args.method == 'rpmnet'):
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(_args.gpu)
-        _device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+
+    _device = get_free_gpu()
+    
+    if _args.gpu >= 0:
+        _device = torch.device('cuda:{}'.format(get_free_gpu())) if torch.cuda.is_available() else torch.device('cpu')
     else:
         _device = torch.device('cpu')
-
+    
     main()

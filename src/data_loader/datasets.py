@@ -30,11 +30,12 @@ def get_train_datasets(args: argparse.Namespace):
         val_categories.sort()
 
     train_transforms, val_transforms = get_transforms(args.noise_type, args.rot_mag, args.trans_mag,
-                                                      args.num_points, args.partial)
+                                                      args.num_points, args.partial, args.view_crop, args.view_up)
     _logger.info('Train transforms: {}'.format(', '.join([type(t).__name__ for t in train_transforms])))
     _logger.info('Val transforms: {}'.format(', '.join([type(t).__name__ for t in val_transforms])))
     train_transforms = torchvision.transforms.Compose(train_transforms)
     val_transforms = torchvision.transforms.Compose(val_transforms)
+    
 
     if args.dataset_type == 'modelnet_hdf':
         train_data = ModelNetHdf(args.dataset_path, subset='train', categories=train_categories,
@@ -59,13 +60,16 @@ def get_test_datasets(args: argparse.Namespace):
         test_categories.sort()
 
     _, test_transforms = get_transforms(args.noise_type, args.rot_mag, args.trans_mag,
-                                        args.num_points, args.partial)
+                                        args.num_points, args.partial, args.view_crop, args.view_up)
     _logger.info('Test transforms: {}'.format(', '.join([type(t).__name__ for t in test_transforms])))
     test_transforms = torchvision.transforms.Compose(test_transforms)
 
     if args.dataset_type == 'modelnet_hdf':
         test_data = ModelNetHdf(args.dataset_path, subset='test', categories=test_categories,
                                 transform=test_transforms)
+    elif args.dataset_type == 'ycb':
+        test_data = YCBobjects(args.dataset_path, transform=test_transforms)    
+    
     else:
         raise NotImplementedError
 
@@ -74,7 +78,7 @@ def get_test_datasets(args: argparse.Namespace):
 
 def get_transforms(noise_type: str,
                    rot_mag: float = 45.0, trans_mag: float = 0.5,
-                   num_points: int = 1024, partial_p_keep: List = None):
+                   num_points: int = 1024, partial_p_keep: List = None, view_crop: bool = False, view_up: str = 'y'):
     """Get the list of transformation to be used for training or evaluating RegNet
 
     Args:
@@ -129,7 +133,7 @@ def get_transforms(noise_type: str,
     elif noise_type == "crop":
         # Both source and reference point clouds cropped, plus same noise in "jitter"
         train_transforms = [Transforms.SplitSourceRef(),
-                            Transforms.RandomCrop(partial_p_keep),
+                            Transforms.RandomCrop(partial_p_keep, view_crop, view_up),
                             Transforms.RandomTransformSE3_euler(rot_mag=rot_mag, trans_mag=trans_mag),
                             Transforms.Resampler(num_points),
                             Transforms.RandomJitter(),
@@ -137,7 +141,7 @@ def get_transforms(noise_type: str,
 
         test_transforms = [Transforms.SetDeterministic(),
                            Transforms.SplitSourceRef(),
-                           Transforms.RandomCrop(partial_p_keep),
+                           Transforms.RandomCrop(partial_p_keep, view_crop, view_up),
                            Transforms.RandomTransformSE3_euler(rot_mag=rot_mag, trans_mag=trans_mag),
                            Transforms.Resampler(num_points),
                            Transforms.RandomJitter(),
@@ -246,6 +250,7 @@ class ModelNetHdf(Dataset):
         self._logger.info('Loaded {} {} instances.'.format(self._data.shape[0], subset))
 
     def __getitem__(self, item):
+        
         sample = {'points': self._data[item, :, :], 'label': self._labels[item], 'idx': np.array(item, dtype=np.int32)}
 
         if self._transform:
@@ -278,6 +283,7 @@ class ModelNetHdf(Dataset):
 
             all_data.append(data)
             all_labels.append(labels)
+        
 
         all_data = np.concatenate(all_data, axis=0)
         all_labels = np.concatenate(all_labels, axis=0)
@@ -300,7 +306,7 @@ class ModelNetHdf(Dataset):
 
 def main():
     
-    output_directory = "/home/chengjing/Desktop/RPMNet/ycb"
+    output_directory = "/home/chengjing/Desktop/RPMNet_hacleg/ycb"
     f = open(os.path.join(output_directory, 'objects.txt'))
     object_list = [line.strip() for line in f.readlines()]
     f.close()

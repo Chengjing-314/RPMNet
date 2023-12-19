@@ -267,6 +267,8 @@ def run(train_set, val_set):
             global_step += 1
 
             optimizer.zero_grad()
+            
+            # print("-----------------", train_data['points_src'].shape)
 
             # Forward through neural network
             dict_all_to_device(train_data, _device)

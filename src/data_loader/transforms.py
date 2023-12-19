@@ -11,6 +11,8 @@ from common.math.random import uniform_2_sphere
 import common.math.se3 as se3
 import common.math.so3 as so3
 
+import open3d as o3d
+
 
 class SplitSourceRef:
     """Clones the point cloud into separate source and reference point clouds"""
@@ -129,10 +131,11 @@ class RandomCrop:
     half-space oriented in this direction.
     If p_keep != 0.5, we shift the plane until approximately p_keep points are retained
     """
-    def __init__(self, p_keep: List = None):
+    def __init__(self, p_keep: List = None, view_crop: bool = False):
         if p_keep is None:
             p_keep = [0.7, 0.7]  # Crop both clouds to 70%
         self.p_keep = np.array(p_keep, dtype=np.float32)
+        self.vpc = view_crop
 
     @staticmethod
     def crop(points, p_keep):
@@ -147,7 +150,41 @@ class RandomCrop:
             mask = dist_from_plane > np.percentile(dist_from_plane, (1.0 - p_keep) * 100)
 
         return points[mask, :]
+    
+    @staticmethod
+    def view_point_crop(points, up_axis='y'):
+        radius = 100
+        pc = o3d.geometry.PointCloud()
+        centroid = np.mean(points[:, :3], axis=0)
+        points_centered = points[:, :3] - centroid
+        pc.points = o3d.utility.Vector3dVector(points_centered)
+        
+        axis_dict = {'x': 0, 'y': 1, 'z': 2}
+        up_index = axis_dict.get(up_axis, 1)  
 
+        min_vals = np.min(points_centered, axis=0)
+        max_vals = np.max(points_centered, axis=0)
+        
+        non_up_axis_offset_range = np.random.uniform(0.1, 0.35)
+        up_axis_extra_height = np.random.uniform(1.1, 1.3)
+
+        cam = np.ones(3)
+        for i in range(3):
+            if i == up_index:
+                cam[i] = up_axis_extra_height + max_vals[i]
+            else:
+                cam[i] = np.random.uniform(min_vals[i] - non_up_axis_offset_range, max_vals[i] + non_up_axis_offset_range)
+
+        # Perform hidden point removal
+        _, idx = pc.hidden_point_removal(cam, radius)
+        pc = pc.select_by_index(idx)
+        new_points = np.asarray(pc.points)
+        new_points = (new_points + centroid).astype(np.float32)
+        normals = points[idx, 3:6]
+        new_points = np.concatenate((new_points, normals), axis=-1)
+
+        return new_points
+        
     def __call__(self, sample):
 
         sample['crop_proportion'] = self.p_keep
@@ -160,7 +197,10 @@ class RandomCrop:
         if len(self.p_keep) == 1:
             sample['points_src'] = self.crop(sample['points_src'], self.p_keep[0])
         else:
-            sample['points_src'] = self.crop(sample['points_src'], self.p_keep[0])
+            if self.vpc:
+                sample['points_src'] = self.view_point_crop(sample['points_src'])
+            else:
+                sample['points_src'] = self.crop(sample['points_src'], self.p_keep[0])
             sample['points_ref'] = self.crop(sample['points_ref'], self.p_keep[1])
         return sample
 

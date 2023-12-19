@@ -173,6 +173,8 @@ class RPMNet(nn.Module):
             src_transformed: Transformed source points
         """
         endpoints = {}
+        
+        print('data:', data['points_ref'].shape)
 
         xyz_ref, norm_ref = data['points_ref'][:, :, :3], data['points_ref'][:, :, 3:6]
         xyz_src, norm_src = data['points_src'][:, :, :3], data['points_src'][:, :, 3:6]

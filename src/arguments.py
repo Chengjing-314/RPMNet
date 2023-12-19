@@ -13,23 +13,33 @@ def rpmnet_arguments():
     parser.add_argument('--name', type=str, help='Prefix to add to logging directory')
     parser.add_argument('--debug', action='store_true', help='If set, will enable autograd anomaly detection')
     # settings for input data_loader
+    # parser.add_argument('-i', '--dataset_path',
+    #                     default='/data/chengjingyuan/RPMNet_hacleg/ycb',
+    #                     type=str, metavar='PATH',
+    #                     help='path to the processed dataset. Default: ../datasets/modelnet40_ply_hdf5_2048')
+    # parser.add_argument('--dataset_type', default='ycb',
+    #                     choices=['modelnet_hdf', 'bunny', 'armadillo', 'buddha', 'dragon', 'ycb'],
+    #                     metavar='DATASET', help='dataset type (default: modelnet_hdf)')
     parser.add_argument('-i', '--dataset_path',
-                        default='/data/chengjingyuan/RPMNet_hacleg/ycb',
+                        default='/data/chengjingyuan/RPMNet_hacleg/datasets/modelnet40_ply_hdf5_2048',
                         type=str, metavar='PATH',
                         help='path to the processed dataset. Default: ../datasets/modelnet40_ply_hdf5_2048')
-    parser.add_argument('--dataset_type', default='ycb',
+    parser.add_argument('--dataset_type', default='modelnet_hdf',
                         choices=['modelnet_hdf', 'bunny', 'armadillo', 'buddha', 'dragon', 'ycb'],
                         metavar='DATASET', help='dataset type (default: modelnet_hdf)')
     parser.add_argument('--num_points', default=1024, type=int,
                         metavar='N', help='points in point-cloud (default: 1024)')
     parser.add_argument('--noise_type', default='crop', choices=['clean', 'jitter', 'crop'],
                         help='Types of perturbation to consider')
-    parser.add_argument('--rot_mag', default=90.0, type=float,
+    parser.add_argument('--rot_mag', default=120.0, type=float,
                         metavar='T', help='Maximum magnitude of rotation perturbation (in degrees)')
-    parser.add_argument('--trans_mag', default=0.5, type=float,
+    parser.add_argument('--trans_mag', default=0.7, type=float,
                         metavar='T', help='Maximum magnitude of translation perturbation')
     parser.add_argument('--partial', default=[0.3, 0.9], nargs='+', type=float,
                         help='Approximate proportion of points to keep for partial overlap (Set to 1.0 to disable)')
+    parser.add_argument('--view_crop', default=False, action='store_true',
+                        help='If set, will crop input point-cloud to a view frustum')
+    parser.add_argument('--view_up', default='y', choices=['x', 'y', 'z'])
     # Model
     parser.add_argument('--method', type=str, default='rpmnet', choices=['rpmnet'],
                         help='Model to use. Note: Only rpmnet is supported for training.'
@@ -66,9 +76,9 @@ def rpmnet_train_arguments():
     """Used only for training"""
     parser = argparse.ArgumentParser(parents=[rpmnet_arguments()])
 
-    parser.add_argument('--train_categoryfile', type=str, metavar='PATH', default='',
+    parser.add_argument('--train_categoryfile', type=str, metavar='PATH', default='/data/chengjingyuan/RPMNet_hacleg/src/data_loader/modelnet40_half1.txt',
                         help='path to the categories to be trained')  # eg. './dataset/modelnet40_half1.txt'
-    parser.add_argument('--val_categoryfile', type=str, metavar='PATH', default='',
+    parser.add_argument('--val_categoryfile', type=str, metavar='PATH', default='/data/chengjingyuan/RPMNet_hacleg/src/data_loader/modelnet40_half1.txt',
                         help='path to the categories to be val')  # eg. './sampledata/modelnet40_half1.txt'
     # Training parameters
     parser.add_argument('--lr', default=1e-4, type=float, help='Learning rate during training')
@@ -93,13 +103,15 @@ def rpmnet_eval_arguments():
     parser = argparse.ArgumentParser(parents=[rpmnet_arguments()])
 
     # settings for input data_loader
-    parser.add_argument('--test_category_file', type=str, metavar='PATH', default='./data_loader/modelnet40_half2.txt',
+    parser.add_argument('--test_category_file', type=str, metavar='PATH', default='/data/chengjingyuan/RPMNet_hacleg/src/data_loader/modelnet40_half2.txt',
                         help='path to the categories to be val')
+    # parser.add_argument('--test_category_file', type=str, metavar='PATH', default='',
+    #                 help='path to the categories to be val')
     # Provided transforms
     parser.add_argument('--transform_file', type=str,
                         help='If provided, will use transforms from this provided pickle file')
     # Save out evaluation data_loader for further analysis
-    parser.add_argument('--eval_save_path', type=str, default='/data/chengjingyuan/RPMNet/eval_results',
+    parser.add_argument('--eval_save_path', type=str, default='/data/chengjingyuan/RPMNet_hacleg/eval_results',
                         help='Output data_loader to save evaluation results')
 
     parser.description = 'RPMNet evaluation'
