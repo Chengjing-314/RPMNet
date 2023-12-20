@@ -13,20 +13,21 @@ def rpmnet_arguments():
     parser.add_argument('--name', type=str, help='Prefix to add to logging directory')
     parser.add_argument('--debug', action='store_true', help='If set, will enable autograd anomaly detection')
     # settings for input data_loader
-    # parser.add_argument('-i', '--dataset_path',
-    #                     default='/data/chengjingyuan/RPMNet_hacleg/ycb',
-    #                     type=str, metavar='PATH',
-    #                     help='path to the processed dataset. Default: ../datasets/modelnet40_ply_hdf5_2048')
-    # parser.add_argument('--dataset_type', default='ycb',
-    #                     choices=['modelnet_hdf', 'bunny', 'armadillo', 'buddha', 'dragon', 'ycb'],
-    #                     metavar='DATASET', help='dataset type (default: modelnet_hdf)')
     parser.add_argument('-i', '--dataset_path',
-                        default='/data/chengjingyuan/RPMNet_hacleg/datasets/modelnet40_ply_hdf5_2048',
+                        default='/data/chengjingyuan/RPMNet_hacleg/ycb',
                         type=str, metavar='PATH',
                         help='path to the processed dataset. Default: ../datasets/modelnet40_ply_hdf5_2048')
-    parser.add_argument('--dataset_type', default='modelnet_hdf',
+    parser.add_argument('--dataset_type', default='ycb',
                         choices=['modelnet_hdf', 'bunny', 'armadillo', 'buddha', 'dragon', 'ycb'],
                         metavar='DATASET', help='dataset type (default: modelnet_hdf)')
+    # parser.add_argument('-i', '--dataset_path',
+    #                     default='/data/chengjingyuan/RPMNet_hacleg/datasets/modelnet40_ply_hdf5_2048',
+    #                     type=str, metavar='PATH',
+    #                     help='path to the processed dataset. Default: ../datasets/modelnet40_ply_hdf5_2048')
+    # parser.add_argument('--dataset_type', default='modelnet_hdf',
+    #                     choices=['modelnet_hdf', 'bunny', 'armadillo', 'buddha', 'dragon', 'ycb'],
+    #                     metavar='DATASET', help='dataset type (default: modelnet_hdf)')
+    parser.add_argument('--use_estimate_normals', default=False, action='store_true')
     parser.add_argument('--num_points', default=1024, type=int,
                         metavar='N', help='points in point-cloud (default: 1024)')
     parser.add_argument('--noise_type', default='crop', choices=['clean', 'jitter', 'crop'],

@@ -10,6 +10,7 @@ f.close()
 
 def normalize_point_cloud(pcd):
     # Center the point cloud
+    pcd = pcd.voxel_down_sample(voxel_size=0.004)
     centroid = np.mean(np.asarray(pcd.points), axis=0)
     pcd.points = o3d.utility.Vector3dVector(np.asarray(pcd.points) - centroid)
 
@@ -29,10 +30,10 @@ for object_name in object_list:
 
     num_points = len(pcd.points)
     print('Object: {}, Num points: {}'.format(object_name, num_points))
-
+    
     # Estimate normals
-    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-    pcd.orient_normals_consistent_tangent_plane(30)
+    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=15))
+    pcd.orient_normals_consistent_tangent_plane(15)
     pcd_normals = np.asarray(pcd.normals).astype(np.float32)
     pcd_normals = np.reshape(pcd_normals, (num_points, 3))
 

@@ -131,11 +131,12 @@ class RandomCrop:
     half-space oriented in this direction.
     If p_keep != 0.5, we shift the plane until approximately p_keep points are retained
     """
-    def __init__(self, p_keep: List = None, view_crop: bool = False):
+    def __init__(self, p_keep: List = None, view_crop: bool = False, up_axis='y'):
         if p_keep is None:
             p_keep = [0.7, 0.7]  # Crop both clouds to 70%
         self.p_keep = np.array(p_keep, dtype=np.float32)
         self.vpc = view_crop
+        self.up_axis = up_axis
 
     @staticmethod
     def crop(points, p_keep):
@@ -198,7 +199,7 @@ class RandomCrop:
             sample['points_src'] = self.crop(sample['points_src'], self.p_keep[0])
         else:
             if self.vpc:
-                sample['points_src'] = self.view_point_crop(sample['points_src'])
+                sample['points_src'] = self.view_point_crop(sample['points_src'], self.up_axis)
             else:
                 sample['points_src'] = self.crop(sample['points_src'], self.p_keep[0])
             sample['points_ref'] = self.crop(sample['points_ref'], self.p_keep[1])

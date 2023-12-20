@@ -39,9 +39,9 @@ def get_train_datasets(args: argparse.Namespace):
 
     if args.dataset_type == 'modelnet_hdf':
         train_data = ModelNetHdf(args.dataset_path, subset='train', categories=train_categories,
-                                 transform=train_transforms)
+                                 transform=train_transforms, use_estimate_normals=args.use_estimate_normals)
         val_data = ModelNetHdf(args.dataset_path, subset='test', categories=val_categories,
-                               transform=val_transforms)
+                               transform=val_transforms, use_estimate_normals=args.use_estimate_normals)
         
     elif args.dataset_type == 'ycb':
         train_data = YCBobjects(args.dataset_path, transform=train_transforms)
@@ -66,7 +66,7 @@ def get_test_datasets(args: argparse.Namespace):
 
     if args.dataset_type == 'modelnet_hdf':
         test_data = ModelNetHdf(args.dataset_path, subset='test', categories=test_categories,
-                                transform=test_transforms)
+                                transform=test_transforms, use_estimate_normals=args.use_estimate_normals)
     elif args.dataset_type == 'ycb':
         test_data = YCBobjects(args.dataset_path, transform=test_transforms)    
     
@@ -168,21 +168,26 @@ class YCBobjects(Dataset):
         # Iterate over the list of objects and add the path to the point cloud file to _data
         for obj in self.objects_list:
             ply_file = os.path.join(self._root, obj, 'clouds', 'normalized_merged_cloud.ply')
-            normals_file = os.path.join(self._root, obj, 'clouds', 'normals.npy')
             if os.path.exists(ply_file):
                 cloud = o3d.io.read_point_cloud(ply_file)
-                points_with_normal = self.pre_process_pc(np.asarray(cloud.points), np.load(normals_file))
+                if len(cloud.points) < 2048:
+                    continue
+                points_with_normal = self.pre_process_pc(cloud)
                 self._data.append(points_with_normal)
             else:
                 self._logger.warning(f"File not found: {ply_file}")
                 
-    def pre_process_pc(self, pc, normals):
+    def pre_process_pc(self, pc):
         #uniform sample 20k points
-        num_points = 2048 * 15
+        num_points = 2048
         
-        rand_indices = np.random.choice(pc.shape[0], num_points, replace=False)
+        # select 2048 points from the point cloud
+        pcd = np.asarray(pc.points)
+        normals = np.asarray(pc.normals)
         
-        points = pc[rand_indices]
+        rand_indices = np.random.choice(pcd.shape[0], num_points, replace=False)
+        
+        points = pcd[rand_indices]
         normals = normals[rand_indices]
             
         points_with_normals = np.concatenate([points, normals], axis=1).astype(np.float32)
@@ -206,7 +211,7 @@ class YCBobjects(Dataset):
     
 
 class ModelNetHdf(Dataset):
-    def __init__(self, dataset_path: str, subset: str = 'train', categories: List = None, transform=None):
+    def __init__(self, dataset_path: str, subset: str = 'train', categories: List = None, transform=None, use_estimate_normals=False):
         """ModelNet40 dataset from PointNet.
         Automatically downloads the dataset if not available
 
@@ -219,6 +224,7 @@ class ModelNetHdf(Dataset):
         """
         self._logger = logging.getLogger(self.__class__.__name__)
         self._root = dataset_path
+        self._use_estimate_normals = use_estimate_normals
 
         metadata_fpath = os.path.join(self._root, '{}_files.txt'.format(subset))
         self._logger.info('Loading data from {} for {}'.format(metadata_fpath, subset))
@@ -266,14 +272,23 @@ class ModelNetHdf(Dataset):
         return self._classes
 
     @staticmethod
-    def _read_h5_files(fnames, categories):
+    def _read_h5_files(fnames, categories, use_estimate_normals=False):
 
         all_data = []
         all_labels = []
 
         for fname in fnames:
             f = h5py.File(fname, mode='r')
-            data = np.concatenate([f['data'][:], f['normal'][:]], axis=-1)
+            
+            if use_estimate_normals:
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(f['data'][:])
+                pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=15))
+                pcd.orient_normals_consistent_tangent_plane(15)
+                normals = np.asarray(pcd.normals).astype(np.float32)
+                data = np.concatenate([f['data'][:], normals], axis=-1)
+            else: 
+                data = np.concatenate([f['data'][:], f['normal'][:]], axis=-1)
             labels = f['label'][:].flatten().astype(np.int64)
 
             if categories is not None:  # Filter out unwanted categories

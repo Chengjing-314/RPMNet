@@ -4,6 +4,7 @@
 ### Linux ###
 *~
 ycb/*
+ycb_depreciated/*
 logs/*
 logs_first_run/*
 *.pth
