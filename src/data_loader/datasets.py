@@ -250,7 +250,7 @@ class ModelNetHdf(Dataset):
             categories_idx = None
             self._logger.info('Using all categories.')
 
-        self._data, self._labels = self._read_h5_files(h5_filelist, categories_idx)
+        self._data, self._labels = self._read_h5_files(h5_filelist, categories_idx, self._use_estimate_normals)
         # self._data, self._labels = self._data[:32], self._labels[:32, ...]
         self._transform = transform
         self._logger.info('Loaded {} {} instances.'.format(self._data.shape[0], subset))
@@ -279,14 +279,9 @@ class ModelNetHdf(Dataset):
 
         for fname in fnames:
             f = h5py.File(fname, mode='r')
-            
             if use_estimate_normals:
-                pcd = o3d.geometry.PointCloud()
-                pcd.points = o3d.utility.Vector3dVector(f['data'][:])
-                pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=15))
-                pcd.orient_normals_consistent_tangent_plane(15)
-                normals = np.asarray(pcd.normals).astype(np.float32)
-                data = np.concatenate([f['data'][:], normals], axis=-1)
+                print("use_estimate_normals", use_estimate_normals)
+                data = np.concatenate([f['data'][:], f['estimate_normals'][:]], axis=-1)
             else: 
                 data = np.concatenate([f['data'][:], f['normal'][:]], axis=-1)
             labels = f['label'][:].flatten().astype(np.int64)
