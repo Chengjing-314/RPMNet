@@ -36,9 +36,27 @@ class RPMNetInference:
 
         src_pc = src_pc.astype(np.float32)
         tgt_pc = tgt_pc.astype(np.float32)
+        
+        if tgt_pc.shape[0] > 1024:
+            tgt_pc = tgt_pc[np.random.choice(tgt_pc.shape[0], 1024, replace=False), :]
+        else:
+            needed_points = 1024 - tgt_pc.shape[0]
+            additional_points = tgt_pc[np.random.choice(tgt_pc.shape[0], needed_points, replace=True), :]
+            tgt_pc = np.concatenate([tgt_pc, additional_points], axis=0)
+    
+        if src_pc.shape[0] > 1024:
+            src_pc = src_pc[np.random.choice(src_pc.shape[0], 1024, replace=False), :]
+        else:
+            needed_points = 1024 - src_pc.shape[0]
+            additional_points = src_pc[np.random.choice(src_pc.shape[0], needed_points, replace=True), :]
+            src_pc = np.concatenate([src_pc, additional_points], axis=0)
+            
+            
+        print(f'src_pc.shape: {src_pc.shape}, tgt_pc.shape: {tgt_pc.shape} before entering rpmnet inference')
 
         src_pc = torch.from_numpy(src_pc).unsqueeze(0)
-        tgt_pc = torch.from_numpy(tgt_pc).unsqueeze(0)
+        tgt_pc = torch.from_numpy(tgt_pc).unsqueeze(0) 
+            
 
         data = {'points_src': src_pc, 'points_ref': tgt_pc}
 
