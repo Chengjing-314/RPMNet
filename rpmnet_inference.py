@@ -27,10 +27,14 @@ class RPMNetInference:
 
     def __init__(self, model_file_path, device = 'cuda'):
         self.device = device 
-        eval_args = rpmnet_eval_arguments().parse_args()
+        eval_args = rpmnet_eval_arguments().parse_args('')
         eval_args.resume = model_file_path
         #args is just to get the model
         self.model = models.rpmnet.get_model(eval_args).to(self.device)
+
+        checkpoint_manager = CheckPointManager('/home/chengjing/Desktop/RPMNet/temp')
+        checkpoint_manager.load(eval_args.resume, 'cuda', self.model)
+
 
     def inference(self, src_pc, tgt_pc, num_iter=5):
 
@@ -66,7 +70,7 @@ class RPMNetInference:
             transform, _ = self.model(data, num_iter=num_iter)
 
 
-        transform = transform[0].cpu().numpy()
+        transform = transform[-1].cpu().numpy()
 
         return transform.squeeze()
     
