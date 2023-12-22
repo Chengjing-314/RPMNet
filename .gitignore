@@ -10,6 +10,7 @@ logs_first_run/*
 *.pth
 datasets/*
 eval_results/*
+modelnet40*/*
 
 # temporary files which can be created if a process still has a handle open of a deleted file
 .fuse_hidden*

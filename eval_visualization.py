@@ -3,6 +3,34 @@ import torch
 from rpmnet_inference import RPMNetInference
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
+import src.data_loader.transforms as Transforms
+import torchvision
+from src.common.torch import dict_all_to_device, CheckPointManager, to_numpy
+from collections import defaultdict
+import json
+import os
+import pickle
+import time
+from typing import Dict, List
+
+import numpy as np
+import open3d  # Need to import before torch
+import pandas as pd
+from scipy import sparse
+from tqdm import tqdm
+import torch
+
+from src.arguments import rpmnet_eval_arguments
+from src.common.misc import prepare_logger
+from src.common.torch import dict_all_to_device, CheckPointManager, to_numpy
+from src.common.math import se3
+from src.common.math_torch import se3
+from src.common.math.so3 import dcm2euler
+from src.data_loader.datasets import get_test_datasets
+import models.rpmnet
+import open3d as o3d
+import h5py
+from scipy.spatial.transform import Rotation
 
 
 def load_pc(filename):
@@ -12,118 +40,289 @@ def load_pc(filename):
     pc_with_normals = np.concatenate((pc_pt, normals), axis=-1) 
     return pc_with_normals
 
-def view_point_crop(points, up_axis='y'):
-    radius = 100
-    pc = o3d.geometry.PointCloud()
-    centroid = np.mean(points[:, :3], axis=0)
-    points_centered = points[:, :3] - centroid
-    pc.points = o3d.utility.Vector3dVector(points_centered)
-    
-    axis_dict = {'x': 0, 'y': 1, 'z': 2}
-    up_index = axis_dict.get(up_axis, 1)  
-
-    min_vals = np.min(points_centered, axis=0)
-    max_vals = np.max(points_centered, axis=0)
-    
-    non_up_axis_offset_range = np.random.uniform(0.1, 0.35)
-    up_axis_extra_height = np.random.uniform(1.1, 1.3)
-
-    cam = np.ones(3)
-    for i in range(3):
-        if i == up_index:
-            cam[i] = up_axis_extra_height + max_vals[i]
-        else:
-            cam[i] = np.random.uniform(min_vals[i] - non_up_axis_offset_range, max_vals[i] + non_up_axis_offset_range)
-
-    # Perform hidden point removal
-    _, idx = pc.hidden_point_removal(cam, radius)
-    pc = pc.select_by_index(idx)
-    new_points = np.asarray(pc.points)
-    new_points = (new_points + centroid).astype(np.float32)
-    normals = points[idx, 3:6]
-    new_points = np.concatenate((new_points, normals), axis=-1)
-
-    return new_points
-
-def get_random_transform():
-    rot = np.random.uniform(0, 0.4 * np.pi, 3) 
-
-    # Generate random translation values
-    trans = np.random.uniform(-2, 2, 3)
-
-    # Create an identity matrix for the transformation
-    transform = np.eye(4)
-
-    # Calculate the rotation matrices for each axis
-    Rx = np.array([[1, 0, 0],
-                   [0, np.cos(rot[0]), -np.sin(rot[0])],
-                   [0, np.sin(rot[0]), np.cos(rot[0])]])
-
-    Ry = np.array([[np.cos(rot[1]), 0, np.sin(rot[1])],
-                   [0, 1, 0],
-                   [-np.sin(rot[1]), 0, np.cos(rot[1])]])
-
-    Rz = np.array([[np.cos(rot[2]), -np.sin(rot[2]), 0],
-                   [np.sin(rot[2]), np.cos(rot[2]), 0],
-                   [0, 0, 1]])
-    R = Rz @ Ry @ Rx
-
-    transform[:3, :3] = R
-    transform[:3, 3] = trans
-
-    return transform
-
-
 def main():
     #load original point cloud 
+
+    test_transforms = [    Transforms.SplitSourceRef(),
+                           Transforms.RandomCrop((0.3,1), True, 'y'),
+                           Transforms.RandomTransformSE3_euler(rot_mag=120, trans_mag=0.7),
+                           Transforms.Resampler(1024),
+                           Transforms.RandomJitter(),
+                           Transforms.ShufflePoints()]
+
+    
+    pc_with_normals = load_pc('/home/chengjing/Desktop/RPMNet/ycb/071_nine_hole_peg_test/clouds/normalized_merged_cloud.ply')
+
+
+    pc_with_normals = pc_with_normals[np.random.choice(pc_with_normals.shape[0], 2048, replace=False), :]
+
+   
+    model_file_path = 'model-best_new.pth'
+    
+
+    test_transforms = torchvision.transforms.Compose(test_transforms)
+
+    #load model
+    eval_arg = rpmnet_eval_arguments().parse_args()
+    eval_arg.resume = model_file_path
+
+    model = models.rpmnet.get_model(eval_arg).to('cuda')
+    model.eval()
+
+    #load data
+    sample = {'points': pc_with_normals}
+    sample = test_transforms(sample)
+    sample['points_src'] = torch.from_numpy(sample['points_src']).unsqueeze(0)
+    sample['points_ref'] = torch.from_numpy(sample['points_ref']).unsqueeze(0)
+    dict_all_to_device(sample, 'cuda')
+
+    #inference
+    with torch.no_grad():
+        transform, _ = model(sample, num_iter=5)
+
+    transform = transform[-1].squeeze(0).cpu().numpy()
+
+    #transform to euler angles
+    r = Rotation.from_matrix(transform[0:3, 0:3])
+    angle_pred = r.as_euler('xyz', degrees=True)
+    r_gt = Rotation.from_matrix(sample['transform_gt'][0:3, 0:3])
+    angle_gt = r_gt.as_euler('xyz', degrees=True)
+
+    print(f'angle_pred: {angle_pred}, angle_gt: {angle_gt}')
+    print('r_mae: ', np.mean(np.abs(angle_pred - angle_gt)))
+
+    #visualize
+
+    #transform point cloud
+
+
+def test(model):
+    #load npy
+
+    data = np.load('/home/chengjing/Desktop/RPMNet/eval_results/val_data.npy', allow_pickle=True)
+
+    eval_pred = np.load('/home/chengjing/Desktop/RPMNet/eval_results/pred_transforms.npy', allow_pickle=True)
+
+
+    print(data.shape, eval_pred.shape)
+  
+
+    data = dict(data[()])
+
+    pts_src = data['points_src']
+
+    pts_ref = data['points_ref']
+
+    idx = 4
+
+    eval_pred = np.squeeze(eval_pred)[idx][-1]
+    pts_src_single = pts_src[idx].cpu().numpy()
+    pts_ref_single = pts_ref[idx].cpu().numpy()
+    pts_gt_single = data['transform_gt'][idx].cpu().numpy()
+
+    
+    print(pts_src_single.shape, pts_ref_single.shape)
+
+    #visualize
+
+    pc_src = o3d.geometry.PointCloud()
+    pc_ref = o3d.geometry.PointCloud()
+
+    pc_src.points = o3d.utility.Vector3dVector(pts_src_single[:, :3])
+    pc_ref.points = o3d.utility.Vector3dVector(pts_ref_single[:, :3])
+
+    print(pts_src_single.shape)
+
+    pc_src.paint_uniform_color([1, 0, 0])
+    pc_ref.paint_uniform_color([0, 1, 0])
+
+    o3d.visualization.draw_geometries([pc_src, pc_ref])
+
+
+    #load model
+
+    # model_file_path = '/home/chengjing/Desktop/RPMNet/model-best_new.pth'
+    # eval_arg = rpmnet_eval_arguments().parse_args()
+    # eval_arg.resume = model_file_path
+    # eval_arg.view_crop = True
+
+    # model = models.rpmnet.get_model(eval_arg)
+    # model.to('cuda')
+
+    model.eval()
+
+    #inference
+
+    with torch.no_grad():
+    
+        data_t = {'points_src': torch.tensor(pts_src_single).unsqueeze(0), 'points_ref': torch.tensor(pts_ref_single).unsqueeze(0)}
+
+        dict_all_to_device(data_t, 'cuda')
+
+        transform, _ = model(data_t, num_iter=5)
+
+        transform = transform[-1].squeeze(0).cpu().numpy()
+
+        # print(len(transform))
+        # print(transform[-1].shape)
+
+        #visualize
+
+        #transform point cloud
+
+        transform = np.concatenate([transform, np.array([[0, 0, 0, 1]])], axis=0)
+
+        pc_src = o3d.geometry.PointCloud()
+        pc_ref = o3d.geometry.PointCloud()
+
+        pc_src.points = o3d.utility.Vector3dVector(pts_src_single[:, :3])
+        pc_ref.points = o3d.utility.Vector3dVector(pts_ref_single[:, :3])
+
+        pc_src.paint_uniform_color([1, 0, 0])
+        pc_ref.paint_uniform_color([0, 1, 0])
+
+        pc_src.transform(transform)
+
+        o3d.visualization.draw_geometries([pc_src, pc_ref])
+
+        #transform to euler angles
+
+        r = Rotation.from_matrix(transform[0:3, 0:3])
+        angle_pred = r.as_euler('xyz', degrees=True)
+
+        r_gt = Rotation.from_matrix(pts_gt_single[0:3, 0:3])
+        angle_gt = r_gt.as_euler('xyz', degrees=True)
+
+
+        eval_r = Rotation.from_matrix(eval_pred[0:3, 0:3])
+        eval_angle_pred = eval_r.as_euler('xyz', degrees=True)
+
+        eval_transform = np.concatenate([eval_pred, np.array([[0, 0, 0, 1]])], axis=0)
+        pc_src_eval = o3d.geometry.PointCloud()
+        pc_src_eval.points = o3d.utility.Vector3dVector(pts_src_single[:, :3])
+        pc_src_eval.paint_uniform_color([1, 0, 0])
+        pc_src_eval.transform(eval_transform)
+
+        o3d.visualization.draw_geometries([pc_src_eval, pc_ref])
+
+
+        print(f'angle_pred: {angle_pred}, angle_gt: {angle_gt}')
+        print('r_mae: ', np.mean(np.abs(angle_pred - angle_gt)))
+        print('eval_r_mae: ', np.mean(np.abs(eval_angle_pred - angle_gt)))
+
+
+    print("--------------------batch_size of 8")
+
+    with torch.no_grad():
+
+        data = np.load('/home/chengjing/Desktop/RPMNet/eval_results/val_data.npy', allow_pickle=True)
+        data = dict(data[()])
+
+        dict_all_to_device(data, 'cuda')
+
+        transform, _ = model(data, num_iter=5)
+
+        transform =to_numpy(torch.stack(transform, dim=1))
+
+def get_model():
+    if _args.method == 'rpmnet':
+        assert _args.resume is not None
+        model = models.rpmnet.get_model(_args)
+        model.to('cuda')
+        saver = CheckPointManager(os.path.join('/home/chengjing/Desktop/RPMNet/temp', 'ckpt', 'models'))
+        saver.load(_args.resume,'cuda', model)
+    else:
+        raise NotImplementedError
+    return model
+
+
+def rpmnet_inference_main():
+
+    test_transforms = [ Transforms.SplitSourceRef(),
+                        Transforms.RandomCrop((0.3,1), True, 'y'),
+                        Transforms.RandomTransformSE3_euler(rot_mag=120, trans_mag=0.7),
+                        Transforms.Resampler(1024),
+                        Transforms.RandomJitter(),
+                        Transforms.ShufflePoints()]
+
     
     pc_with_normals = load_pc('/home/chengjing/Desktop/RPMNet/ycb/004_sugar_box/clouds/normalized_merged_cloud.ply')
-    #crop it
-    cropped_pc_with_normals = view_point_crop(pc_with_normals)
-    #rigid trainsform original pc
-    gt_transform = get_random_transform()
-    tgt_pcd = o3d.geometry.PointCloud()
-    tgt_pcd.points = o3d.utility.Vector3dVector(pc_with_normals[:, :3])
-    tgt_pcd.normals = o3d.utility.Vector3dVector(pc_with_normals[:, 3:6])
-    tgt_pcd.transform(gt_transform)
-    
-    src_pcd = o3d.geometry.PointCloud()
-    src_pcd.points = o3d.utility.Vector3dVector(cropped_pc_with_normals[:, :3])
-    src_pcd.normals = o3d.utility.Vector3dVector(cropped_pc_with_normals[:, 3:6])
-    
-    o3d.visualization.draw_geometries([src_pcd, tgt_pcd])
-    
-    tgt_pcd_pts = np.asarray(tgt_pcd.points).astype(np.float32)
-    tgt_pcd_normals = np.asarray(tgt_pcd.normals).astype(np.float32)
-    
-    tgt_pc_with_normals = np.concatenate((tgt_pcd_pts, tgt_pcd_normals), axis=-1)
-    
-    rpmnet = RPMNetInference('./model-best-test.pth')
-    transform = rpmnet.inference(cropped_pc_with_normals, tgt_pc_with_normals)
-    transform = np.vstack((transform, np.array([0, 0, 0, 1])))
-    
-    
-    #compare transform with gt_transform
-    r_gt_euler = R.from_matrix(gt_transform[:3, :3]).as_euler('xyz', degrees=True)
-    r_euler = R.from_matrix(transform[:3, :3]).as_euler('xyz', degrees=True)
-    
-    print('r_mae', np.mean(np.abs(r_gt_euler - r_euler)))
-    print('t_mae', np.mean(np.abs(gt_transform[:3, 3] - transform[:3, 3])))
-    
-    
-    src_pcd.transform(transform)
-    
-    #paint color
-    src_pcd.paint_uniform_color([1, 0, 0])
-    tgt_pcd.paint_uniform_color([0, 1, 0])
-    
-    o3d.visualization.draw_geometries([src_pcd, tgt_pcd])
-    
-    
 
+
+    rpmnet = RPMNetInference('/home/chengjing/Desktop/RPMNet/model-best_new.pth')
+
+
+    test_transforms = torchvision.transforms.Compose(test_transforms)
+
+    data = {'points': pc_with_normals}
+    data = test_transforms(data)
+
+
+    #visualize
+    pc_src = o3d.geometry.PointCloud()
+    pc_ref = o3d.geometry.PointCloud()
+
+    pc_src.points = o3d.utility.Vector3dVector(data['points_src'][:, :3])
+    pc_ref.points = o3d.utility.Vector3dVector(data['points_ref'][:, :3])
+
+    pc_src.paint_uniform_color([1, 0, 0])
+    pc_ref.paint_uniform_color([0, 1, 0])
+
+    o3d.visualization.draw_geometries([pc_src, pc_ref])
+
+
+
+    transforms = rpmnet.inference(data['points_src'], data['points_ref'], num_iter=5)
+    gt_transform = data['transform_gt']
+
+    print(transforms, gt_transform)
+
+    #transform to euler angles
+    r = Rotation.from_matrix(transforms[0:3, 0:3])
+    angle_pred = r.as_euler('xyz', degrees=True)
+    r_gt = Rotation.from_matrix(gt_transform[0:3, 0:3])
+    angle_gt = r_gt.as_euler('xyz', degrees=True)
+
+    print(f'angle_pred: {angle_pred}, angle_gt: {angle_gt}')
+    print('r_mae: ', np.mean(np.abs(angle_pred - angle_gt)))
+
+
+    transforms = np.concatenate([transforms, np.array([[0, 0, 0, 1]])], axis=0)
+
+    #visualize
+
+    src_pc = o3d.geometry.PointCloud()
+    ref_pc = o3d.geometry.PointCloud()
+
+    src_pc.points = o3d.utility.Vector3dVector(data['points_src'][:, :3])
+
+    ref_pc.points = o3d.utility.Vector3dVector(data['points_ref'][:, :3])
+
+    src_pc.paint_uniform_color([1, 0, 0])
+    ref_pc.paint_uniform_color([0, 1, 0])
+
+    src_pc.transform(transforms)
+
+    o3d.visualization.draw_geometries([src_pc, ref_pc])
+
+
+
+
+
+
+
+
+
+
+        
 if __name__ == '__main__':
-    main()
+    # main()
+    parser = rpmnet_eval_arguments()
+    _args = parser.parse_args()
 
-# 1. load original point cloud 2, crop it 3, rigid trainsform original pc , 4 run rpmnet, 5. visualize
-    
-    
+    model = get_model()
+
+    test(model)
+
+    # rpmnet_inference_main()
+

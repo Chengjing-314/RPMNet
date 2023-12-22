@@ -23,6 +23,11 @@ def normalize_point_cloud(pcd):
 
 for object_name in object_list:
     ply_file = os.path.join('ycb', object_name, 'clouds', 'merged_cloud.ply')
+    
+    if not os.path.exists(ply_file):
+        print('File {} does not exist'.format(ply_file))
+        continue
+
     pcd = o3d.io.read_point_cloud(ply_file)
 
     # Normalize the point cloud

@@ -104,6 +104,60 @@ class RPMNetInference:
 
         o3d.visualization.draw_geometries([src_pc, tgt_pc])
 
+    def pipeline(self, src_pc, tgt_pc, num_iter=5, visualize=False):
+            
+            src_pc = src_pc.astype(np.float32)
+            tgt_pc = tgt_pc.astype(np.float32)
+
+            src_pcd = o3d.geometry.PointCloud()
+            tgt_pcd = o3d.geometry.PointCloud()
+
+            src_pcd.points = o3d.utility.Vector3dVector(src_pc)
+            tgt_pcd.points = o3d.utility.Vector3dVector(tgt_pc)
+
+
+            src_pcd = src_pcd.voxel_down_sample(voxel_size=0.002)
+            tgt_pcd = tgt_pcd.voxel_down_sample(voxel_size=0.002)
+
+            src_pc = np.asarray(src_pcd.points).astype(np.float32)
+            tgt_pc = np.asarray(tgt_pcd.points).astype(np.float32)
+
+
+            src_pc, src_scale, src_cent = self._preprocess_pc(src_pc)
+            tgt_pc, tgt_scale, tgt_cent = self._preprocess_pc(tgt_pc)
+            
+
+            #estimate normals
+            src_pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.05, max_nn=15))
+            tgt_pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.05, max_nn=15))
+
+            src_pcd.orient_normals_consistent_tangent_plane(15)
+            tgt_pcd.orient_normals_consistent_tangent_plane(15)
+
+            src_pc_pts = np.asarray(src_pcd.points)
+            src_pc_normals = np.asarray(src_pcd.normals)
+
+            tgt_pc_pts = np.asarray(tgt_pcd.points)
+            tgt_pc_normals = np.asarray(tgt_pcd.normals)
+
+            src_pc_with_normals = np.concatenate((src_pc_pts, src_pc_normals), axis=1)
+            tgt_pc_with_normals = np.concatenate((tgt_pc_pts, tgt_pc_normals), axis=1)
+
+            transform = self.inference(src_pc_with_normals, tgt_pc_with_normals, num_iter=num_iter)
+
+
+            if visualize:
+                self._visualization(src_pc, tgt_pc, transform)
+
+            transform = np.vstack((transform, np.array([0, 0, 0, 1])))
+
+
+            return transform
+
+
+
+
+
 
 def main():
 
