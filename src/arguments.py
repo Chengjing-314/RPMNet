@@ -32,7 +32,7 @@ def rpmnet_arguments():
                         metavar='N', help='points in point-cloud (default: 1024)')
     parser.add_argument('--noise_type', default='crop', choices=['clean', 'jitter', 'crop'],
                         help='Types of perturbation to consider')
-    parser.add_argument('--rot_mag', default=120.0, type=float,
+    parser.add_argument('--rot_mag', default=150.0, type=float,
                         metavar='T', help='Maximum magnitude of rotation perturbation (in degrees)')
     parser.add_argument('--trans_mag', default=0.7, type=float,
                         metavar='T', help='Maximum magnitude of translation perturbation')

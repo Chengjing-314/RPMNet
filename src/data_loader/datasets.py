@@ -163,6 +163,7 @@ class YCBobjects(Dataset):
         f = open(os.path.join(dataset_path, 'objects.txt'))
         object_list = [line.strip() for line in f.readlines()]
         f.close()
+        cnt = 0
         
         self.objects_list = object_list
         # Iterate over the list of objects and add the path to the point cloud file to _data
@@ -174,8 +175,12 @@ class YCBobjects(Dataset):
                     continue
                 points_with_normal = self.pre_process_pc(cloud)
                 self._data.append(points_with_normal)
+                cnt += 1
+                print(obj, "has been added to the dataset")
             else:
                 self._logger.warning(f"File not found: {ply_file}")
+                
+        print("total number of objects: ", cnt)
                 
     def pre_process_pc(self, pc):
         #uniform sample 20k points

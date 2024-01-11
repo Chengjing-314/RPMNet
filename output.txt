@@ -1,0 +1,40 @@
+Available GPU IDs: [2, 3]
+Available GPU IDs: [2, 3]
+partial_p_keep [0.3, 0.9]
+001_chips_can has been added to the dataset
+002_master_chef_can has been added to the dataset
+003_cracker_box has been added to the dataset
+004_sugar_box has been added to the dataset
+005_tomato_soup_can has been added to the dataset
+006_mustard_bottle has been added to the dataset
+007_tuna_fish_can has been added to the dataset
+008_pudding_box has been added to the dataset
+009_gelatin_box has been added to the dataset
+010_potted_meat_can has been added to the dataset
+011_banana has been added to the dataset
+013_apple has been added to the dataset
+015_peach has been added to the dataset
+016_pear has been added to the dataset
+017_orange has been added to the dataset
+019_pitcher_base has been added to the dataset
+021_bleach_cleanser has been added to the dataset
+022_windex_bottle has been added to the dataset
+024_bowl has been added to the dataset
+026_sponge has been added to the dataset
+027_skillet has been added to the dataset
+029_plate has been added to the dataset
+033_spatula has been added to the dataset
+036_wood_block has been added to the dataset
+044_flat_screwdriver has been added to the dataset
+048_hammer has been added to the dataset
+054_softball has been added to the dataset
+055_baseball has been added to the dataset
+070-a_colored_wood_blocks has been added to the dataset
+071_nine_hole_peg_test has been added to the dataset
+072-a_toy_airplane has been added to the dataset
+077_rubiks_cube has been added to the dataset
+total number of objects:  32
+data: torch.Size([8, 922, 6])
+data: torch.Size([8, 922, 6])
+data: torch.Size([8, 922, 6])
+data: torch.Size([8, 922, 6])

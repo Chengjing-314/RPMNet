@@ -200,6 +200,8 @@ class RandomCrop:
         else:
             if self.vpc:
                 sample['points_src'] = self.view_point_crop(sample['points_src'], self.up_axis)
+                random_portion = np.random.uniform(self.p_keep[0], 0.9)
+                sample['points_src'] = self.crop(sample['points_src'], random_portion)
             else:
                 sample['points_src'] = self.crop(sample['points_src'], self.p_keep[0])
             sample['points_ref'] = self.crop(sample['points_ref'], self.p_keep[1])
