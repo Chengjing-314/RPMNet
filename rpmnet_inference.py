@@ -12,13 +12,16 @@ from scipy import sparse
 from tqdm import tqdm
 import torch
 
-from src.arguments import rpmnet_eval_arguments
-from src.common.misc import prepare_logger
-from src.common.torch import dict_all_to_device, CheckPointManager, to_numpy
-from src.common.math import se3
-from src.common.math_torch import se3
-from src.common.math.so3 import dcm2euler
-from src.data_loader.datasets import get_test_datasets
+import sys 
+sys.path.append(os.getcwd())
+
+from RPMNet.src.arguments import rpmnet_eval_arguments
+from RPMNet.src.common.misc import prepare_logger
+from RPMNet.src.common.torch import dict_all_to_device, CheckPointManager, to_numpy
+from RPMNet.src.common.math import se3
+from RPMNet.src.common.math_torch import se3
+from RPMNet.src.common.math.so3 import dcm2euler
+from RPMNet.src.data_loader.datasets import get_test_datasets
 import models.rpmnet
 import open3d as o3d
 
@@ -104,7 +107,38 @@ class RPMNetInference:
 
         o3d.visualization.draw_geometries([src_pc, tgt_pc])
 
-    def pipeline(self, src_pc, tgt_pc, num_iter=5, visualize=False):
+    def real2sim_alignment(self, src_pc, camera_translation, dog_translation, nn = 2, radius = 0.01, offset = 0.2, ratio = 0.6, visualize = False):
+
+        total_translation = camera_translation + dog_translation
+
+        diameter = np.linalg.norm(np.max(src_pc, axis=0) - np.min(src_pc, axis=0))
+
+        camera_pos_left = total_translation.copy()
+        camera_pos_left[1] -= offset
+
+        camera_pos_right = total_translation.copy()
+        camera_pos_right[1] += offset
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(src_pc)
+
+        _, pt_map = pcd.hidden_point_removal(camera_pos_left * ratio, diameter * 500)
+
+        pcd_new_left = pcd.select_by_index(pt_map)
+
+        _, pt_map = pcd_new_left.hidden_point_removal(camera_pos_right * ratio, diameter * 500)
+
+        pcd_new = pcd_new_left.select_by_index(pt_map)
+
+        cl, _ = pcd_new.remove_radius_outlier(nb_points=nn, radius=radius)
+
+        if visualize:
+            o3d.visualization.draw_geometries([cl])
+        
+        return np.asarray(cl.points)
+
+
+    def pipeline(self, src_pc, tgt_pc, num_iter=5, visualize=False, visualize_normal=False):
             
             src_pc = src_pc.astype(np.float32)
             tgt_pc = tgt_pc.astype(np.float32)
@@ -128,11 +162,23 @@ class RPMNetInference:
             
 
             #estimate normals
-            src_pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.05, max_nn=15))
+            src_pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.12, max_nn=35))
             tgt_pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.05, max_nn=15))
+
+
+            if visualize:
+                coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.1, origin=[0, 0, 0])
+                src_pcd.paint_uniform_color([1, 0, 0])
+                tgt_pcd.paint_uniform_color([0, 1, 0])
+                o3d.visualization.draw_geometries([src_pcd, tgt_pcd, coordinate_frame])
+
 
             src_pcd.orient_normals_consistent_tangent_plane(15)
             tgt_pcd.orient_normals_consistent_tangent_plane(15)
+
+            if visualize_normal:
+                o3d.visualization.draw_geometries([src_pcd])
+                o3d.visualization.draw_geometries([tgt_pcd])
 
             src_pc_pts = np.asarray(src_pcd.points)
             src_pc_normals = np.asarray(src_pcd.normals)
@@ -145,11 +191,15 @@ class RPMNetInference:
 
             transform = self.inference(src_pc_with_normals, tgt_pc_with_normals, num_iter=num_iter)
 
+            # transform[:3, 3] = transform[:3, 3] * src_scale
+
+            # transform[2,3] += 0.02
 
             if visualize:
                 self._visualization(src_pc, tgt_pc, transform)
 
             transform = np.vstack((transform, np.array([0, 0, 0, 1])))
+
 
 
             return transform

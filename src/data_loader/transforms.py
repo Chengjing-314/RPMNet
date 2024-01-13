@@ -200,7 +200,8 @@ class RandomCrop:
         else:
             if self.vpc:
                 sample['points_src'] = self.view_point_crop(sample['points_src'], self.up_axis)
-                random_portion = np.random.uniform(self.p_keep[0], 0.9)
+                random_portion = np.random.uniform(self.p_keep[0], 0.5) #FIXME
+                print('double crop: ', random_portion)
                 sample['points_src'] = self.crop(sample['points_src'], random_portion)
             else:
                 sample['points_src'] = self.crop(sample['points_src'], self.p_keep[0])

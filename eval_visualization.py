@@ -44,7 +44,7 @@ def main():
     #load original point cloud 
 
     test_transforms = [    Transforms.SplitSourceRef(),
-                           Transforms.RandomCrop((0.3,1), True, 'y'),
+                           Transforms.RandomCrop((0.6,1), True, 'y'),
                            Transforms.RandomTransformSE3_euler(rot_mag=120, trans_mag=0.7),
                            Transforms.Resampler(1024),
                            Transforms.RandomJitter(),
@@ -246,10 +246,14 @@ def rpmnet_inference_main():
                         Transforms.ShufflePoints()]
 
     
-    pc_with_normals = load_pc('/home/chengjing/Desktop/RPMNet/ycb/004_sugar_box/clouds/normalized_merged_cloud.ply')
+    pc_with_normals = load_pc('/home/chengjing/Desktop/RPMNet/ycb/006_mustard_bottle/clouds/normalized_merged_cloud.ply')
+
+    # sugar box, bleach, skillet, airplane, hammer
 
 
-    rpmnet = RPMNetInference('/home/chengjing/Desktop/RPMNet/model-best_new.pth')
+    # rpmnet = RPMNetInference('/home/chengjing/Desktop/RPMNet/model-best_new.pth')
+    
+    rpmnet = RPMNetInference('/home/chengjing/Downloads/model-best-ycb-dble-crop.pth')
 
 
     test_transforms = torchvision.transforms.Compose(test_transforms)
@@ -320,9 +324,11 @@ if __name__ == '__main__':
     parser = rpmnet_eval_arguments()
     _args = parser.parse_args()
 
-    model = get_model()
+    # model = get_model()
 
-    test(model)
+    # test(model)
+
+    rpmnet_inference_main()
 
     # rpmnet_inference_main()
 
